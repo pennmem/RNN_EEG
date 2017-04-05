@@ -7,15 +7,18 @@ rng = np.random
 # simulate data
 N = 400
 feats = 784
-D = (rng.randn(N,feats), rng.randint(size = N, low=0, high=2))
+n_class = 3
+D = (rng.randn(N,feats), rng.randint(size = N, low=0, high=3))
 
 x = T.dmatrix("x")
 y = T.dvector("y")
-w = theano.shared(rng.randn(feats), name = 'w')
-b = theano.shared(0.0, name='b')
-p_1 = 1/(1 + T.exp(-T.dot(x,w) - b))
-prediction = p_1 > 0.5
-xent = -y * T.log(p_1+0.0000001) - (1-y) * T.log(1-p_1-0.0000000001)
+w = theano.shared(rng.randn(feats,n_class), name = 'w')
+b = theano.shared(value = np.zeros(n_class,), name='b')
+p_1 = T.nnet.softmax(T.dot(x,w)+b)
+prediction = T.argmax(p_1)
+#xent = -y * T.log(p_1+0.0000001) - (1-y) * T.log(1-p_1-0.0000000001)
+xent = -(y*T.log(p_1+0.00000001))
+
 cost = xent.mean() + 0.01*(w**2).sum()
 gw, gb = T.grad(cost, [w,b])
 
