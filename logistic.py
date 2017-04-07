@@ -9,7 +9,7 @@ def softmax(x):
     return output
 
 def sample_y(p):
-    return np.random.multinomial(1,p,size = 1)
+    return np.random.multinomial(1,p,size = 1)[0]
 
 def find_class(y):
     return np.where(y > 0)
@@ -22,20 +22,25 @@ X = rng.randn(N,feats)
 W = rng.randn(feats,n_class)*0.2
 b = np.array([-0.5,0,0.3])
 o = np.apply_along_axis(softmax,1,np.dot(X,W) + b)
-y = np.apply_along_axis(sample_y,1,o)
-y = np.argmax(y, axis = 1)
+y_sim = np.apply_along_axis(sample_y,1,o)
 
-D = (X,y)
+
+y_sim = np.argmax(y_sim, axis = 1)
+y_sim  = y_sim.astype(np.int32)
+
+
+D = (X,y_sim)
 
 # build model
 x = T.dmatrix("x")
-y = T.dmatrix("y")
+y = T.ivector("y")
 w = theano.shared(rng.randn(feats,n_class), name = 'w')
 b = theano.shared(value = np.zeros((1,n_class)), name='b', broadcastable = (True,False))
 p_1 = T.nnet.softmax(T.dot(x,w)+b)
 prediction = T.argmax(p_1)
 #xent = -y * T.log(p_1+0.0000001) - (1-y) * T.log(1-p_1-0.0000000001)
-xent = -T.sum(y*T.log(p_1),1)
+#xent = -T.sum(y*T.log(p_1),1)
+xent = -T.log(p_1)[T.arange(y.shape[0]),y]
 cost = xent.mean()
 gw, gb = T.grad(cost, [w,b])
 
