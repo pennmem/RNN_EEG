@@ -15,12 +15,12 @@ def find_class(y):
     return np.where(y > 0)
 
 # simulate data
-N = 1000
+N = 20000
 feats = 10
-n_class = 3
+n_class = 10
 X = rng.randn(N,feats)
 W = rng.randn(feats,n_class)*0.2
-b = np.array([-0.5,0,0.3])
+b = np.array([-0.5,0,0.3,-0.6,0.7,0.9,1.0,.55,.35,.56])
 o = np.apply_along_axis(softmax,1,np.dot(X,W) + b)
 y_sim = np.apply_along_axis(sample_y,1,o)
 
@@ -46,7 +46,7 @@ gw, gb = T.grad(cost, [w,b])
 
 train = theano.function(inputs = [x,y], outputs = [prediction, xent.mean()], updates = ((w, w-0.1*gw), (b, b-0.1*gb)))
 predict = theano.function(inputs =[x], outputs = prediction)
-training_steps = 10000
+training_steps = 1000
 for i in range(training_steps):
     pred, err = train(D[0], D[1])
     if i%100 == 0:
