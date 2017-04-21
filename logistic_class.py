@@ -26,6 +26,10 @@ class LogisticRegression(object):
         return T.mean(T.neq(self.y_pred,y))
 
 
+
+
+
+
 def shared_dataset(data_xy, borrow = True):
     data_x, data_y = data_xy
     shared_x = theano.shared(np.asarray(data_x, dtype = theano.config.floatX), borrow = borrow)
