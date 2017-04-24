@@ -19,6 +19,8 @@ import os
 import pickle
 import timeit
 import scipy.io as sio
+from sklearn import metrics
+
 
 
 # logistic layer
@@ -46,7 +48,8 @@ class LogisticRegression(object):
 
 
 
-# Recurrent layer
+
+
 class Recurrent(object):
     # n_input : input dimension (#elec x 8 frequencies)
     # n_h : dimension of hidden layer
@@ -111,27 +114,54 @@ class RNN(object):
         self.params = self.recurrentLayer.params + self.logRegressionLayer.params
         self.input = input
         self.errors = self.logRegressionLayer.errors
+        self.predict = self.logRegressionLayer.p_1
 
 
-#
+
 # test mlp
 # load MNIST data
 
-url = 'http://www.iro.umontreal.ca/~lisa/deep/data/mnist/mnist.pkl.gz'
-dataset = os.getcwd() + '/dataset'
-
-urllib.urlretrieve(url, dataset)
-
-with gzip.open(dataset, 'rb') as f:
-        train_set, valid_set, test_set = pickle.load(f)
+# url = 'http://www.iro.umontreal.ca/~lisa/deep/data/mnist/mnist.pkl.gz'
+# dataset = os.getcwd() + '/dataset'
+#
+# urllib.urlretrieve(url, dataset)
+#
+# with gzip.open(dataset, 'rb') as f:
+#         train_set, valid_set, test_set = pickle.load(f)
 # read data
+dir = '/Volumes/RHINO/scratch/tphan/FR1/R1065J.mat'
+data = sio.loadmat(dir)
+session = data['session']
+pos = data['pos']
+y = data['y']
+x = data['x']
+
+ix_out = 2
+
+unique_sessions = np.unique(session)
+train_set_indices =np.where(session != unique_sessions[ix_out])[1].astype(int)
+x_train = x[train_set_indices,:]
+session_train = session[0,train_set_indices]
+y_train = y[0,train_set_indices]
+unique_session_train = np.unique(session_train)
+
+for sess in unique_session_train:
+    indices = np.where(session_train == sess)[0]
+    x_train[indices,:] = np.apply_along_axis(lambda z: (z-np.mean(z))/np.std(z) ,0, x_train[indices,:])
+
+valid_set_indices =np.where(session == unique_sessions[ix_out])[1].astype(int)
+x_valid = x[valid_set_indices,:]
+x_valid = np.apply_along_axis(lambda z: (z-np.mean(z))/np.std(z),0,x_valid)
+
+session_valid = session[0,valid_set_indices]
+y_valid = y[0,valid_set_indices]
 
 
-train_set_x, train_set_y = train_set
-valid_set_x, valid_set_y = valid_set
+train_set_x, train_set_y = x_train, y_train
+valid_set_x, valid_set_y = x_valid, y_valid
 
 
-test_set_x, test_set_y = test_set
+#test_set_x, test_set_y = test_set
 batch_size = 12
 
 
@@ -150,29 +180,31 @@ def shared_dataset(data_xy, borrow = True):
 
 train_set_x, train_set_y = shared_dataset((train_set_x,train_set_y))
 valid_set_x, valid_set_y = shared_dataset((valid_set_x,valid_set_y))
-test_set_x, test_set_y = shared_dataset((test_set_x,test_set_y))
+#test_set_x, test_set_y = shared_dataset((test_set_x,test_set_y))
 
 
 
 n_train_batches = train_set_x.get_value(borrow = True).shape[0]//batch_size
 n_valid_batches = valid_set_x.get_value(borrow = True).shape[0]//batch_size
-n_test_batches = test_set_x.get_value(borrow = True).shape[0]//batch_size
+#n_test_batches = test_set_x.get_value(borrow = True).shape[0]//batch_size
 
-rng = np.random.RandomState(1234)
+rng = np.random.RandomState()
 
 # build model
-L2_reg = 0.00001 # select later
-learning_rate = 7.2e-4*2
+L2_reg = 10# select later
+learning_rate = 0.01
 x = T.dmatrix('x')
 y = T.ivector('y')
 index = T.lscalar('ind')
-n_h = 200
 
-n_in = 28*28
-n_h = 400
+n_in = x_train.shape[1]
+n_h = n_in
+n_out = 2
 
 
-rnn_classifier = RNN(rng, input = x,  n_in = 28*28 , n_h = n_h , n_out = 10)
+
+
+rnn_classifier = RNN(rng, input = x,  n_in = n_in , n_h = n_h , n_out = 2)
 cost = rnn_classifier.negative_log_likelihood(y) + rnn_classifier.L2_cost*L2_reg
 gparams = [T.grad(cost, param) for param in rnn_classifier.params]
 updates = [(param, param-learning_rate*gparam) for param,gparam in zip(rnn_classifier.params, gparams)]
@@ -187,25 +219,25 @@ train_model = theano.function(inputs=[index],
                              )
 
 
+
 validate_model = theano.function(
     inputs=[index],
-    outputs=rnn_classifier.errors(y),
+    outputs=[rnn_classifier.errors(y), rnn_classifier.predict],
     givens={
         x: valid_set_x[index * batch_size:(index + 1) * batch_size],
         y: valid_set_y[index * batch_size:(index + 1) * batch_size]
     }
 )
 
+#
+# test_model = theano.function(inputs = [index], outputs = rnn_classifier.errors(y), givens = {x:test_set_x[index*batch_size:(index+1)*batch_size],
+# y:test_set_y[index*batch_size:(index+1)*batch_size]})
 
-test_model = theano.function(inputs = [index], outputs = rnn_classifier.errors(y), givens = {x:test_set_x[index*batch_size:(index+1)*batch_size],
-y:test_set_y[index*batch_size:(index+1)*batch_size]})
 
-
-
-# traing model
+# traning model
 
 print '... training the model'
-patience =10000
+patience =1000
 patience_increase = 2
 improvement_threshold = 0.995
 validation_frequency = min(n_train_batches, patience//2)
@@ -228,9 +260,9 @@ while(epoch < n_epochs) and (not done_looping):
             validation_losses = [validate_model(i) for i in range(n_valid_batches)]
             this_validation_loss = np.mean(validation_losses)
 
-            test_losses = [test_model(i) for i in range(n_test_batches)]
-            test_score = np.mean(test_losses)
-            print 'epoch %i, minibatch %i/%i, test error of best model %f %%'%(epoch, minibatch_index+1,n_train_batches, test_score*100)
+            #test_losses = [test_model(i) for i in range(n_test_batches)]
+            #test_score = np.mean(test_losses)
+            #print 'epoch %i, minibatch %i/%i, test error of best model %f %%'%(epoch, minibatch_index+1,n_train_batches, test_score*100)
 
             print 'epoch %i, minibatch %i/%i, validation error %f %%'%(epoch, minibatch_index+1, n_train_batches, this_validation_loss*100)
             #print 'epoch %i, minibatch %i/%i, validation error %f %%'.format(epoch, minibatch_index+1, n_train_batches, this_validation_loss*100)
