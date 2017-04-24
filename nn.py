@@ -45,9 +45,6 @@ class LogisticRegression(object):
 
 
 
-
-
-
 class HiddenLayer(object):
         def __init__(self, rng, input, n_in, n_out, W = None, b = None, activation = T.tanh):
                 self.input = input
