@@ -21,7 +21,9 @@ import timeit
 import scipy.io as sio
 import itertools
 from sklearn import metrics
-
+from matplotlib import pyplot as plt
+import collections
+import pandas as pd
 
 
 # logistic layer
@@ -49,9 +51,6 @@ class LogisticRegression(object):
 
 
 
-
-
-
 class Recurrent(object):
     # n_input : input dimension (#elec x 8 frequencies)
     # n_h : dimension of hidden layer
@@ -67,9 +66,12 @@ class Recurrent(object):
 
         self.h0 = theano.shared(name = 'h0', value = h0_values)
         if W is None:
-            W_values = np.asarray(
-                rng.uniform(low=-np.sqrt(3. / n_h), high=np.sqrt(3. / n_h), size=(n_h, n_h)),
-                dtype=theano.config.floatX)
+            # W_values = np.asarray(
+            #     rng.uniform(low=-np.sqrt(3. / n_h), high=np.sqrt(3. / n_h), size=(n_h, n_h)),
+            #     dtype=theano.config.floatX)
+            W_values = np.asarray(np.identity(n_h), dtype = theano.config.floatX)
+
+
         if activation == T.nnet.sigmoid:
             W_values *= 4
 
@@ -98,7 +100,7 @@ class Recurrent(object):
         h,updates = theano.scan(fn = recurrence, sequences = input,
                          outputs_info = [dict(initial = self.h0)], n_steps = input.shape[0])
 
-        theano.printing.Print('print h')(h)
+        #theano.printing.Print('print h')(h)
 
         print type(h)
 
@@ -112,6 +114,7 @@ class RNN(object):
         self.recurrentLayer = Recurrent(rng = rng, input = input, n_input = n_in, n_h = n_h, activation = T.nnet.relu)
         self.logRegressionLayer = LogisticRegression(input = self.recurrentLayer.output, n_in = n_h, n_out = n_out, weights = weights)
         self.L2_cost = (self.recurrentLayer.W**2).sum() + (self.recurrentLayer.U**2).sum() + (self.logRegressionLayer.V**2).sum()
+
         self.negative_log_likelihood = self.logRegressionLayer.negative_log_likelihood
         self.params = self.recurrentLayer.params + self.logRegressionLayer.params
         self.input = input
@@ -130,7 +133,7 @@ class RNN(object):
 #
 # with gzip.open(dataset, 'rb') as f:
 #         train_set, valid_set, test_set = pickle.load(f)
-dir = '/Volumes/RHINO/scratch/tphan/FR1/R1065J.mat'
+dir = '/Volumes/RHINO/scratch/tphan/FR1/R1002P.mat'
 data = sio.loadmat(dir)
 session = data['session']
 pos = data['pos']
@@ -144,9 +147,10 @@ x_data = data['x']
 # session = session[:,1:]
 unique_sessions = np.unique(session)
 
-for sess in unique_sessions :
+for sess in unique_sessions:
     indices = np.where(session == sess)[1]
     x_data[indices,:] = np.apply_along_axis(lambda z: (z-np.mean(z))/np.std(z) ,0, x_data[indices,:])
+
 
 auc_session = np.zeros(len(unique_sessions))
 prob_session = []
@@ -214,12 +218,16 @@ for ii in range(len(unique_sessions)):
     index = T.lscalar('ind')
 
     n_in = x_train.shape[1]
-    n_h = n_in
+    n_h = np.int(n_in/2)
     n_out = 2
 
+    n_total = n_in*n_h + n_h**2 + n_h*n_out
 
-    L2_reg = 0.0001
-    learning_rate = 0.005
+    L2_reg = 100.0/n_total
+
+
+
+    learning_rate = 5.0e-3
 
 
     rnn_classifier = RNN(rng, input = x,  n_in = n_in , n_h = n_h , n_out = 2, weights = weights)
@@ -256,7 +264,7 @@ for ii in range(len(unique_sessions)):
     # traning model
 
     print '... training the model'
-    patience = 50000
+    patience = 10000
     patience_increase = 2
     improvement_threshold = 0.995
     validation_frequency = min(n_train_batches, patience//2)
@@ -267,6 +275,9 @@ for ii in range(len(unique_sessions)):
     start_time = timeit.default_timer()
     done_looping = False
     n_epochs = 2000
+
+    validation_loss_list = []
+    auc_loss_list = []
 
     # implement early-stopping rule
 
@@ -282,6 +293,9 @@ for ii in range(len(unique_sessions)):
                 prob = list(itertools.chain.from_iterable([loss[1][:,1] for loss in validation_losses]))
                 fpr, tpr, thresholds = metrics.roc_curve(y_valid, prob, pos_label = 1)
                 auc = metrics.auc(fpr,tpr)
+
+                validation_loss_list.append(this_validation_loss)
+                auc_loss_list.append(auc)
 
                 #test_losses = [test_model(i) for i in range(n_test_batches)]
                 #test_score = np.mean(test_losses)
@@ -324,3 +338,22 @@ print auc
 
 print auc_session
 print np.mean(auc_session)
+
+result = collections.OrderedDict()
+result['subject'] = subject
+result['lambda'] = L2_reg
+result['alpha'] = learning_rate
+result['AUC'] = auc
+
+result = pd.DataFrame([result])
+with open('/Volumes/RHINO/home2/tungphan/RNN/rnn.csv', 'a') as f:
+    result.to_csv(f, header = False)
+
+f.close()
+
+
+fig  = plt.figure()
+ax1 = fig.add_subplot(211)
+ax2 = fig.add_subplot(212)
+ax1.plot(np.arange(len(validation_loss_list)), validation_loss_list )
+ax2.plot(np.arange(len(validation_loss_list)), auc_loss_list )

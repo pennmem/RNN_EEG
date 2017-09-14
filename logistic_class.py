@@ -69,13 +69,13 @@ prob_session = []
 y_session = []
 L2_grid = np.exp(np.arange(-10,10, step = 1))
 
-n_samp = 50
+n_samp =1
 auc_grid = np.zeros(n_samp)
 lambda_grid = np.zeros(n_samp)
 
 
 for k in range(n_samp):
-    L2_reg = 10**np.random.uniform(-6,1)
+    L2_reg = 1.0
     prob_session = []
     y_session = []
     for ii in range(len(unique_sessions)):
@@ -112,7 +112,6 @@ for k in range(n_samp):
 
         batch_size = 12
 
-
         # build model
         x = T.dmatrix("x")
         y = T.ivector("y")
@@ -125,10 +124,15 @@ for k in range(n_samp):
         #L2_reg = 1.0/7.2*10**4/len(y_train)
         #L2_reg  = 10
 
+
+
+        print 'n train batches', n_train_batches
         n_feature = x_train.shape[1]
         n_class = 2
-        C = 1.0
-        #L2_reg = 1
+
+        C = 7.2*1e-4/n_train_batches*12
+        L2_reg = 1.0/C
+        C = 1
 
         classifier = LogisticRegression(input=x, n_feature = n_feature, n_class = n_class, weights= weights)
         cost =C*classifier.negative_log_likelihood(y) + classifier.L2_cost*L2_reg*0.5
