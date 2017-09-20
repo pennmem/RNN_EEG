@@ -16,8 +16,6 @@ def build_mlp(input_var = None):
     return l_out
 
 
-
-
 # build_cnn()
 
 def build_cnn(input_var = None):
