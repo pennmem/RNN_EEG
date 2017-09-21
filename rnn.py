@@ -27,18 +27,11 @@ from rnn_class import*
 import lasagne
 
 
-
 args = sys.argv
-penalty_index = np.int(args[1])
-subject_index = np.int(args[2])
-
-
+subject_index = np.int(args[1])
 
 mount_point = '/Volumes/RHINO'  # rhino mount point
 
-penalty_grid = 10**np.linspace(-3,7,10)
-L2_reg = penalty_grid[penalty_index]
-L2_reg = 0.001
 
 
 subjects = np.sort(os.listdir(mount_point+ '/scratch/tphan/frequency_selection/'))  # get all subjects
@@ -79,15 +72,13 @@ alpha_session = []
 
 # hyperparameters
 np.random.seed(100)
-lambda_grid = np.sort(10**np.random.uniform(-7,2,10))
+lambda_grid = np.sort(10**np.random.uniform(-7,3,20))
 learning_rate_grid = np.array([1.0e-3, 1.0e-4])
 
 
 
 
 auc_array = np.zeros(shape = (len(learning_rate_grid), len(lambda_grid)))
-
-auc_array = np.random.uniform(0,10, size = len(learning_rate_grid)*len(lambda_grid)).reshape(len(lambda_grid), len(learning_rate_grid))
 
 for ii, sess in enumerate(unique_sessions):
 
