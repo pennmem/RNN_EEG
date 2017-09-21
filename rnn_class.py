@@ -15,6 +15,7 @@ import pandas as pd
 import collections
 from scipy.stats.mstats import zscore
 from rnn_class import*
+from theano import printing
 
 def normalize_sessions(pow_mat, event_sessions):
     sessions = np.unique(event_sessions)
@@ -24,6 +25,26 @@ def normalize_sessions(pow_mat, event_sessions):
     return pow_mat
 
 
+def RMSprop(cost, params, lr = 0.001, rho = 0.99, epsilon = 1e-6):
+    gparams = [T.grad(cost, param) for param in params]
+    updates = []
+    for param, gparam in zip(params, gparams):
+
+        acc = theano.shared(param.get_value()*np.float32(0.), broadcastable = param.broadcastable)
+        acc_new = rho*acc + (np.float32(1)-rho)*gparam**2
+        gradient_scaling = T.sqrt(acc_new) + epsilon
+
+
+        #printing.Print(gradient_scaling)
+
+        gparam = gparam/gradient_scaling
+
+        theano.printing.Print('gparam')(gparam)
+
+        updates.append((acc, acc_new))
+        updates.append((param, param-lr*gparam))
+
+    return updates
 
 
 # logistic layer
@@ -42,7 +63,7 @@ class LogisticRegression(object):
 
     def negative_log_likelihood(self,y):
         # cost function
-        return -T.mean(T.log(self.p_1)[T.arange(y.shape[0]),y]*self.weights)
+        return -T.sum(T.log(self.p_1)[T.arange(y.shape[0]),y]*self.weights)
 
 
     def errors(self,y):
@@ -66,10 +87,10 @@ class Recurrent(object):
 
         self.h0 = theano.shared(name = 'h0', value = h0_values)
         if W is None:
-            # W_values = np.asarray(
-            #     rng.uniform(low=-np.sqrt(3. / n_h), high=np.sqrt(3. / n_h), size=(n_h, n_h)),
-            #     dtype=theano.config.floatX)
-            W_values = np.asarray(np.identity(n_h), dtype = theano.config.floatX)
+            W_values = np.asarray(
+                rng.uniform(low=-np.sqrt(3. / n_h), high=np.sqrt(3. / n_h), size=(n_h, n_h)),
+                dtype=theano.config.floatX)
+            # W_values = np.asarray(np.identity(n_h), dtype = theano.config.floatX)
 
 
         if activation == T.nnet.sigmoid:
@@ -201,17 +222,18 @@ def cv(x_data, y_data, list_pos, list_unique, serialpos, learning_rate, L2_reg, 
         #decay_rate = 0.9
         #cache = decay_rate*cache + (1-decay_rate)*
 
+        cost = rnn_classifier.negative_log_likelihood(y) + rnn_classifier.L2_cost*L2_reg/N_train*batch_size
 
+        updates = RMSprop(cost, rnn_classifier.params,lr = learning_rate, rho = 0.95)
 
-        cost = rnn_classifier.negative_log_likelihood(y) + rnn_classifier.L2_cost*L2_reg/N_train
-        gparams = [T.grad(cost, param) for param in rnn_classifier.params]
-        updates = [(param, param-learning_rate*gparam) for param,gparam in zip(rnn_classifier.params, gparams)]
-
+        # gparams = [T.grad(cost, param) for param in rnn_classifier.params]
+        # updates = [(param, param-learning_rate*gparam) for param,gparam in zip(rnn_classifier.params, gparams)]
+        #
 
         # build models
 
         train_model = theano.function(inputs=[index1, index2],
-                                       outputs=[cost,gparams[0],rnn_classifier.params[0]],
+                                       outputs=cost,
                                        updates=updates,
                                        givens={
                                             x: train_set_x[index1:index2],
@@ -269,10 +291,10 @@ def cv(x_data, y_data, list_pos, list_unique, serialpos, learning_rate, L2_reg, 
         while(epoch < n_epochs) and (not done_looping):
             epoch = epoch + 1
             for i in np.arange(n_train_batches-1):
-                minibatch_avg_cost, update_scale, param_scale = train_model(train_batches_start_indices[i], train_batches_start_indices[i+1])
+                minibatch_avg_cost= train_model(train_batches_start_indices[i], train_batches_start_indices[i+1])
                 iter += train_batches_start_indices[i+1] - train_batches_start_indices[i]
 
-                print np.mean( np.abs(update_scale*learning_rate)/np.abs(param_scale))
+                # print np.mean( np.abs(update_scale*learning_rate)/np.abs(param_scale))
 
 
                 #print np.mean(np.abs(update_scale)*learning_rate/np.abs(param_scale))

@@ -235,7 +235,7 @@ for ii, sess in enumerate(unique_sessions):
 
 
 
-    patience = N_train*50
+    patience = N_train*100
     patience_increase = 2
     improvement_threshold = 0.995
     validation_frequency = min(N_train, patience//2)
