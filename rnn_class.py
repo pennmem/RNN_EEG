@@ -16,6 +16,8 @@ import collections
 from scipy.stats.mstats import zscore
 from rnn_class import*
 from theano import printing
+import lasagne
+import theano
 
 def normalize_sessions(pow_mat, event_sessions):
     sessions = np.unique(event_sessions)
@@ -25,21 +27,18 @@ def normalize_sessions(pow_mat, event_sessions):
     return pow_mat
 
 
-def RMSprop(cost, params, lr = 0.001, rho = 0.99, epsilon = 1e-6):
+def RMSprop(cost, params, lr = 0.001, rho = 0.99, epsilon = 1.0e-3):
     gparams = [T.grad(cost, param) for param in params]
     updates = []
     for param, gparam in zip(params, gparams):
 
-        acc = theano.shared(param.get_value()*np.float32(0.), broadcastable = param.broadcastable)
-        acc_new = rho*acc + (np.float32(1)-rho)*gparam**2
+        acc = theano.shared(param.get_value()*0., broadcastable = param.broadcastable)
+        acc_new = rho*acc + (1.0-rho)*gparam**2
         gradient_scaling = T.sqrt(acc_new) + epsilon
-
 
         #printing.Print(gradient_scaling)
 
         gparam = gparam/gradient_scaling
-
-        theano.printing.Print('gparam')(gparam)
 
         updates.append((acc, acc_new))
         updates.append((param, param-lr*gparam))
@@ -63,7 +62,7 @@ class LogisticRegression(object):
 
     def negative_log_likelihood(self,y):
         # cost function
-        return -T.sum(T.log(self.p_1)[T.arange(y.shape[0]),y]*self.weights)
+        return -T.mean(T.log(self.p_1)[T.arange(y.shape[0]),y]*self.weights)
 
 
     def errors(self,y):
@@ -222,13 +221,17 @@ def cv(x_data, y_data, list_pos, list_unique, serialpos, learning_rate, L2_reg, 
         #decay_rate = 0.9
         #cache = decay_rate*cache + (1-decay_rate)*
 
-        cost = rnn_classifier.negative_log_likelihood(y) + rnn_classifier.L2_cost*L2_reg/N_train*batch_size
+        cost = rnn_classifier.negative_log_likelihood(y) + rnn_classifier.L2_cost*L2_reg/N_train
+        params = rnn_classifier.params
+        # updates = RMSprop(cost, rnn_classifier.params,lr = learning_rate, rho = 0.95)
+        #updates = nesterov_momentum(cost, params, learning_rate=1e-4, momentum=.9)
+        #updates = lasagne.updates.rmsprop(cost, params, learning_rate = 1e-4)
+        updates = lasagne.updates.adadelta(cost, params, learning_rate = learning_rate)
 
-        updates = RMSprop(cost, rnn_classifier.params,lr = learning_rate, rho = 0.95)
 
         # gparams = [T.grad(cost, param) for param in rnn_classifier.params]
         # updates = [(param, param-learning_rate*gparam) for param,gparam in zip(rnn_classifier.params, gparams)]
-        #
+        # #
 
         # build models
 
