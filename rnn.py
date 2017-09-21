@@ -27,8 +27,10 @@ from rnn_class import*
 import lasagne
 
 
-args = sys.argv
-subject_index = np.int(args[1])
+#args = sys.argv
+#subject_index = np.int(args[1])
+
+subject_index = 1
 
 mount_point = '/Volumes/RHINO'  # rhino mount point
 
@@ -63,7 +65,7 @@ unique_sessions = np.unique(event_sessions)
 x_data = normalize_sessions(x_data,event_sessions)
 
 
-auc_session = np.zeros(len(unique_sessions))
+auc_session = np.zeros(n_sess)
 prob_session = []
 y_session = []
 L2_session = []
@@ -158,7 +160,7 @@ for ii, sess in enumerate(unique_sessions):
     index2 = T.lscalar('ind')
 
     n_in = x_train.shape[1]
-    n_h = np.min([n_in,500]) # 500 latent units
+    n_h = np.min([n_in,n_in]) # 500 latent units
     n_out = 2
 
     n_total = n_in*n_h + n_h**2 + n_h*n_out
@@ -293,6 +295,8 @@ result['lambda'] = L2_session
 result['alpha'] = alpha_session
 result['AUC'] = auc
 result['AUC_session'] = auc_session
+result['lambda_grid'] = lambda_grid
+result['alpha_grid'] = learning_rate_grid
 
 
 result = pd.DataFrame([result])

@@ -259,6 +259,7 @@ def cv(x_data, y_data, list_pos, list_unique, serialpos, learning_rate, L2_reg, 
 
 
 
+
         start_time = timeit.default_timer()
         done_looping = False
         n_epochs = 5000
