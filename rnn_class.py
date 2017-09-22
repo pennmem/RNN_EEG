@@ -153,7 +153,7 @@ def shared_dataset(data_xy, borrow = True):
 # Output: dictionary of cved AUC and corresponding params
 def cv(x_data, y_data, list_pos, list_unique, serialpos, learning_rate, L2_reg, n_folds = 5, n_h = 500):
 
-    folds = np.split(list_unique,n_folds)
+    folds = np.array_split(list_unique,n_folds)
 
     auc_folds = np.zeros(n_folds)
     prob_fold = []
@@ -262,7 +262,7 @@ def cv(x_data, y_data, list_pos, list_unique, serialpos, learning_rate, L2_reg, 
 
         start_time = timeit.default_timer()
         done_looping = False
-        n_epochs = 5000
+        n_epochs = 500
 
         validation_loss_list = []
         auc_loss_list = []
@@ -280,7 +280,7 @@ def cv(x_data, y_data, list_pos, list_unique, serialpos, learning_rate, L2_reg, 
 
         patience = N_train*200
         patience_increase = 2
-        improvement_threshold = 0.995
+        improvement_threshold = 0.990
         validation_frequency = min(N_train, patience//2)
         best_validation_loss= np.inf
         epoch = 0
@@ -346,6 +346,3 @@ def cv(x_data, y_data, list_pos, list_unique, serialpos, learning_rate, L2_reg, 
     fpr, tpr, thresholds = metrics.roc_curve(y_fold, prob_fold, pos_label = 1)
     auc = metrics.auc(fpr,tpr)
     return auc
-
-
-

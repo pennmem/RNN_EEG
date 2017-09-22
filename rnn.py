@@ -27,12 +27,12 @@ from rnn_class import*
 import lasagne
 
 
-#args = sys.argv
-#subject_index = np.int(args[1])
+args = sys.argv
+subject_index = np.int(args[1])
 
-subject_index = 1
+#subject_index = 1
 
-mount_point = '/Volumes/RHINO'  # rhino mount point
+mount_point = ''  # rhino mount point
 
 
 
@@ -56,12 +56,6 @@ list_pos = dataset['list']
 unique_sessions = np.unique(event_sessions)
 
 
-
-
-#penalty_grid = 10**np.random.uniform(-6,1,20)
-
-
-
 x_data = normalize_sessions(x_data,event_sessions)
 
 
@@ -74,14 +68,17 @@ alpha_session = []
 
 # hyperparameters
 np.random.seed(100)
-lambda_grid = np.sort(10**np.random.uniform(-7,3,20))
-learning_rate_grid = np.array([1.0e-3, 1.0e-4])
-
-
-
+#lambda_grid = np.sort(10**np.random.uniform(-7,3,20))
+lambda_grid = np.sort(10**np.random.uniform(-7,3,1))
+#learning_rate_grid = np.array([1.0e-3, 1.0e-4])
+learning_rate_grid = np.array([1.0e-3])
 
 auc_array = np.zeros(shape = (len(learning_rate_grid), len(lambda_grid)))
 
+
+print subject
+
+start_time = timeit.default_timer()
 for ii, sess in enumerate(unique_sessions):
 
 
@@ -114,13 +111,13 @@ for ii, sess in enumerate(unique_sessions):
     auc_folds = np.zeros(n_folds)
 
 
-    start_time = timeit.default_timer()
+
 
     for i in np.arange(len(lambda_grid)):
         for j in np.arange(len(learning_rate_grid)):
             auc_array[j,i] = cv(x_train, y_train, list_train, np.unique(list_train), serialpos_train, learning_rate_grid[j], lambda_grid[i])
 
-    end_time = timeit.default_timer()
+
 
 
     index = np.argmax(auc_array)
@@ -160,7 +157,7 @@ for ii, sess in enumerate(unique_sessions):
     index2 = T.lscalar('ind')
 
     n_in = x_train.shape[1]
-    n_h = np.min([n_in,n_in]) # 500 latent units
+    n_h = np.min([n_in,n_in]) # all units
     n_out = 2
 
     n_total = n_in*n_h + n_h**2 + n_h*n_out
@@ -278,7 +275,6 @@ for ii, sess in enumerate(unique_sessions):
 
     end_time = timeit.default_timer()
 
-
 print 'The code run for %d epochs, with %f epochs/sec'%(epoch, 1.*epoch/(end_time-start_time))
 
 prob_session = list(itertools.chain.from_iterable([prob for prob in prob_session]))
@@ -287,6 +283,10 @@ y_session = list(itertools.chain.from_iterable([z for z in y_session]))
 fpr, tpr, thresholds = metrics.roc_curve(y_session, prob_session, pos_label = 1)
 auc = metrics.auc(fpr,tpr)
 
+
+end_time = timeit.default_timer()
+
+print end_time-start_time
 
 
 result = collections.OrderedDict()
